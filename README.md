@@ -31,9 +31,9 @@ Or type
 
     ./run_DGCNN.sh DATANAME FOLD
 
-to run on another dataset = DATANAME with fold number = FOLD as testing set.
+to run on dataset = DATANAME using fold number = FOLD (1-10, corresponds to which fold to use as test data in the cross-validation experiments).
 
-Check "run_DGCNN.sh" for more configuration options.
+Check "run_DGCNN.sh" for more options.
 
 Reference
 ---------
