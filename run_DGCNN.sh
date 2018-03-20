@@ -62,17 +62,47 @@ IMDBMULTI)
   ;;
 esac
 
-
-CUDA_VISIBLE_DEVICES=${GPU} python main.py \
-    -seed 1 \
-    -data $DATA \
-    -learning_rate $learning_rate \
-    -num_epochs $num_epochs \
-    -hidden $n_hidden \
-    -latent_dim $CONV_SIZE \
-    -sortpooling_k $sortpooling_k \
-    -out_dim $FP_LEN \
-    -batch_size $bsize \
-    -gm $gm \
-    -mode $gpu_or_cpu \
-    -dropout $dropout
+if [ ${fold} == 0 ]; then
+  rm result.txt
+  echo "Running 10-fold cross validation"
+  start=`date +%s`
+  for i in $(seq 1 10)
+  do
+    CUDA_VISIBLE_DEVICES=${GPU} python main.py \
+        -seed 1 \
+        -data $DATA \
+        -fold $i \
+        -learning_rate $learning_rate \
+        -num_epochs $num_epochs \
+        -hidden $n_hidden \
+        -latent_dim $CONV_SIZE \
+        -sortpooling_k $sortpooling_k \
+        -out_dim $FP_LEN \
+        -batch_size $bsize \
+        -gm $gm \
+        -mode $gpu_or_cpu \
+        -dropout $dropout
+  done
+  stop=`date +%s`
+  echo "End of cross-validation"
+  echo "The total running time is $[stop - start] seconds."
+  echo "The accuracy results for ${DATA} are as follows:"
+  cat result.txt
+  echo "Average accuracy is"
+  cat result.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
+else
+  CUDA_VISIBLE_DEVICES=${GPU} python main.py \
+      -seed 1 \
+      -data $DATA \
+      -fold $fold \
+      -learning_rate $learning_rate \
+      -num_epochs $num_epochs \
+      -hidden $n_hidden \
+      -latent_dim $CONV_SIZE \
+      -sortpooling_k $sortpooling_k \
+      -out_dim $FP_LEN \
+      -batch_size $bsize \
+      -gm $gm \
+      -mode $gpu_or_cpu \
+      -dropout $dropout
+fi

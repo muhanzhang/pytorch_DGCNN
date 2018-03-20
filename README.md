@@ -33,6 +33,8 @@ Or type
 
 to run on dataset = DATANAME using fold number = FOLD (1-10, corresponds to which fold to use as test data in the cross-validation experiments).
 
+If you set FOLD = 0, e.g., typing "./run_DGCNN.sh DD 0", then it will run 10-fold cross validation on DD and report the average accuracy.
+
 Check "run_DGCNN.sh" for more options.
 
 Reference

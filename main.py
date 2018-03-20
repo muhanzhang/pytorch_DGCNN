@@ -104,7 +104,7 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
         assert n_samples == len(sample_idxes)
     total_loss = np.array(total_loss)
     avg_loss = np.sum(total_loss, 0) / n_samples
-    return avg_loss
+    return avg_loss, acc
 
 
 if __name__ == '__main__':
@@ -131,10 +131,12 @@ if __name__ == '__main__':
     for epoch in range(cmd_args.num_epochs):
         random.shuffle(train_idxes)
         classifier.train()
-        avg_loss = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
+        avg_loss, _ = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
         print('\033[92maverage training of epoch %d: loss %.5f acc %.5f\033[0m' % (epoch, avg_loss[0], avg_loss[1]))
         
         classifier.eval()
-        test_loss = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
+        test_loss, test_acc = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
         print('\033[93maverage test of epoch %d: loss %.5f acc %.5f\033[0m' % (epoch, test_loss[0], test_loss[1]))
 
+    with open('result.txt', 'a+') as f:
+        f.write(str(test_acc) + '\n')
