@@ -56,7 +56,7 @@ def load_data():
     label_dict = {}
     feat_dict = {}
 
-    with open('pytorch_structure2vec-master/graph_classification/data/%s/%s.txt' % (cmd_args.data, cmd_args.data), 'r') as f:
+    with open('data/%s/%s.txt' % (cmd_args.data, cmd_args.data), 'r') as f:
         n_g = int(f.readline().strip())
         for i in range(n_g):
             row = f.readline().strip().split()
@@ -89,8 +89,8 @@ def load_data():
     print('# classes: %d' % cmd_args.num_class)
     print('# node features: %d' % cmd_args.feat_dim)
 
-    train_idxes = np.loadtxt('pytorch_structure2vec-master/graph_classification/data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
-    test_idxes = np.loadtxt('pytorch_structure2vec-master/graph_classification/data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+    train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+    test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
 
     return [g_list[i] for i in train_idxes], [g_list[i] for i in test_idxes]
 
