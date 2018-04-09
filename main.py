@@ -55,15 +55,44 @@ class Classifier(nn.Module):
     def PrepareFeatureLabel(self, batch_graph):
         labels = torch.LongTensor(len(batch_graph))
         n_nodes = 0
-        concat_feat = []
+
+        if batch_graph[0].node_tags is not None:
+            node_tag_flag = True
+            concat_tag = []
+        else:
+            node_tag_flag = False
+
+        if batch_graph[0].node_features is not None:
+            node_feat_flag = True
+            concat_feat = []
+        else:
+            node_feat_flag = False
+
         for i in range(len(batch_graph)):
             labels[i] = batch_graph[i].label
             n_nodes += batch_graph[i].num_nodes
-            concat_feat += batch_graph[i].node_tags
+            if node_tag_flag == True:
+                concat_tag += batch_graph[i].node_tags
+            if node_feat_flag == True:
+                concat_feat += torch.from_numpy(batch_graph[i].node_features)
         
-        concat_feat = torch.LongTensor(concat_feat).view(-1, 1)
-        node_feat = torch.zeros(n_nodes, cmd_args.feat_dim)
-        node_feat.scatter_(1, concat_feat, 1)
+        if node_tag_flag == True:
+            concat_tag = torch.LongTensor(concat_tag).view(-1, 1)
+            node_tag = torch.zeros(n_nodes, cmd_args.feat_dim)
+            node_tag.scatter_(1, concat_tag, 1)
+
+        if node_feat_flag == True:
+            node_feat = torch.cat(concat_feat, 0)
+
+        if node_feat_flag and node_tag_flag:
+            # concatenate one-hot embedding of node tags (node labels) with continuous node features
+            node_feat = torch.cat([node_tag.type_as(node_feat), node_feat], 1)
+        elif node_feat_flag == False and node_tag_flag == True:
+            node_feat = node_tag
+        elif node_feat_flag == True and node_tag_flag == False:
+            pass
+        else:
+            node_feat = torch.ones(n_nodes, 1)  # use all-one vector as node features
 
         if cmd_args.mode == 'gpu':
             node_feat = node_feat.cuda() 

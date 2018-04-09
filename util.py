@@ -15,7 +15,7 @@ cmd_opt.add_argument('-gm', default='mean_field', help='mean_field/loopy_bp')
 cmd_opt.add_argument('-data', default=None, help='data folder name')
 cmd_opt.add_argument('-batch_size', type=int, default=50, help='minibatch size')
 cmd_opt.add_argument('-seed', type=int, default=1, help='seed')
-cmd_opt.add_argument('-feat_dim', type=int, default=0, help='dimension of node feature')
+cmd_opt.add_argument('-feat_dim', type=int, default=0, help='dimension of discrete node feature (maximum node tag)')
 cmd_opt.add_argument('-num_class', type=int, default=0, help='#classes')
 cmd_opt.add_argument('-fold', type=int, default=1, help='fold (1..10)')
 cmd_opt.add_argument('-num_epochs', type=int, default=1000, help='number of epochs')
@@ -36,10 +36,17 @@ if len(cmd_args.latent_dim) == 1:
 print(cmd_args)
 
 class S2VGraph(object):
-    def __init__(self, g, node_tags, label):
+    def __init__(self, g, label, node_tags=None, node_features=None):
+        '''
+            g: a networkx graph
+            label: an integer graph label
+            node_tags: a list of integer node tags
+            node_features: a numpy array of continuous node features
+        '''
         self.num_nodes = len(node_tags)
         self.node_tags = node_tags
         self.label = label
+        self.node_features = node_features  # numpy array (node_num * feature_dim)
         self.degs = dict(g.degree).values()
 
         x, y = zip(*g.edges())
@@ -81,13 +88,13 @@ def load_data():
                     g.add_edge(j, row[k])
             #assert len(g.edges()) * 2 == n_edges  (some graphs in COLLAB have self-loops, ignored here)
             assert len(g) == n
-            g_list.append(S2VGraph(g, node_tags, l))
+            g_list.append(S2VGraph(g, l, node_tags))
     for g in g_list:
         g.label = label_dict[g.label]
     cmd_args.num_class = len(label_dict)
     cmd_args.feat_dim = len(feat_dict)
     print('# classes: %d' % cmd_args.num_class)
-    print('# node features: %d' % cmd_args.feat_dim)
+    print('# maximum node tag: %d' % cmd_args.feat_dim)
 
     train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
     test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
