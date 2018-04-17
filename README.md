@@ -53,7 +53,7 @@ Datasets
 
 Default graph datasets are stored in "data/DSName/DSName.txt". Check the "data/README.md" for the format. 
 
-In addition to the support of discrete node labels (tags), DGCNN now supports multi-dimensional continuous node features. One example dataset with continuous node features is "FRANKENSTEIN". Check "data/FRANKENSTEIN/FRANKENSTEIN.txt" for the format. 
+In addition to the support of discrete node labels (tags), DGCNN now supports multi-dimensional continuous node features. One example dataset with continuous node features is "Synthie". Check "data/Synthie/Synthie.txt" for the format. 
 
 There are two preprocessing scripts in MATLAB: "mat2txt.m" transforms .mat graphs (from Weisfeiler-Lehman Graph Kernel Toolbox), "dortmund2txt.m" transforms graph benchmark datasets downloaded from https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets
 

@@ -1,4 +1,4 @@
-datasets = strvcat('FRANKENSTEIN');
+datasets = strvcat('Synthie');
 
 for ith_data = 1: size(datasets, 1)
     dataset = strcat(datasets(ith_data, :));
