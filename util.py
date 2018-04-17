@@ -6,7 +6,7 @@ import os
 import cPickle as cp
 #import _pickle as cp  # python3 compatability
 import networkx as nx
-
+import pdb
 import argparse
 
 cmd_opt = argparse.ArgumentParser(description='Argparser for graph_classification')
@@ -18,6 +18,7 @@ cmd_opt.add_argument('-seed', type=int, default=1, help='seed')
 cmd_opt.add_argument('-feat_dim', type=int, default=0, help='dimension of discrete node feature (maximum node tag)')
 cmd_opt.add_argument('-num_class', type=int, default=0, help='#classes')
 cmd_opt.add_argument('-fold', type=int, default=1, help='fold (1..10)')
+cmd_opt.add_argument('-test_number', type=int, default=0, help='if specified, will overwrite -fold and use the last -test_number graphs as testing data')
 cmd_opt.add_argument('-num_epochs', type=int, default=1000, help='number of epochs')
 cmd_opt.add_argument('-latent_dim', type=str, default='64', help='dimension(s) of latent layers')
 cmd_opt.add_argument('-sortpooling_k', type=float, default=30, help='number of nodes kept after SortPooling')
@@ -57,8 +58,8 @@ class S2VGraph(object):
         self.edge_pairs = self.edge_pairs.flatten()
 
 def load_data():
-    print('loading data')
 
+    print('loading data')
     g_list = []
     label_dict = {}
     feat_dict = {}
@@ -73,31 +74,58 @@ def load_data():
                 label_dict[l] = mapped
             g = nx.Graph()
             node_tags = []
+            node_features = []
             n_edges = 0
             for j in range(n):
                 g.add_node(j)
                 row = f.readline().strip().split()
-                row = [int(w) for w in row]
+                tmp = int(row[1]) + 2
+                if tmp == len(row):
+                    # no node attributes
+                    row = [int(w) for w in row]
+                    attr = None
+                else:
+                    row, attr = [int(w) for w in row[:tmp]], np.array([float(w) for w in row[tmp:]])
                 if not row[0] in feat_dict:
                     mapped = len(feat_dict)
                     feat_dict[row[0]] = mapped
                 node_tags.append(feat_dict[row[0]])
 
+                if tmp > len(row):
+                    node_features.append(attr)
+
                 n_edges += row[1]
                 for k in range(2, len(row)):
                     g.add_edge(j, row[k])
+
+            if node_features != []:
+                node_features = np.stack(node_features)
+                node_feature_flag = True
+            else:
+                node_features = None
+                node_feature_flag = False
+
             #assert len(g.edges()) * 2 == n_edges  (some graphs in COLLAB have self-loops, ignored here)
             assert len(g) == n
-            g_list.append(S2VGraph(g, l, node_tags))
+            g_list.append(S2VGraph(g, l, node_tags, node_features))
     for g in g_list:
         g.label = label_dict[g.label]
     cmd_args.num_class = len(label_dict)
-    cmd_args.feat_dim = len(feat_dict)
+    cmd_args.feat_dim = len(feat_dict) # maximum node label (tag)
+    if node_feature_flag == True:
+        cmd_args.attr_dim = node_features.shape[1] # dim of node features (attributes)
+    else:
+        cmd_args.attr_dim = 0
+
     print('# classes: %d' % cmd_args.num_class)
     print('# maximum node tag: %d' % cmd_args.feat_dim)
 
-    train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
-    test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+    if cmd_args.test_number == 0:
+        train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+        test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+        return [g_list[i] for i in train_idxes], [g_list[i] for i in test_idxes]
+    else:
+        return g_list[: n_g - cmd_args.test_number], g_list[n_g - cmd_args.test_number :]
 
-    return [g_list[i] for i in train_idxes], [g_list[i] for i in test_idxes]
+
 

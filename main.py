@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import math
-
+import pdb
 from DGCNN_embedding import DGCNN 
 from mlp_dropout import MLPClassifier
 
@@ -35,7 +35,7 @@ class Classifier(nn.Module):
         if cmd_args.gm == 'DGCNN':
             self.s2v = model(latent_dim=cmd_args.latent_dim, 
                             output_dim=cmd_args.out_dim,
-                            num_node_feats=cmd_args.feat_dim, 
+                            num_node_feats=cmd_args.feat_dim+cmd_args.attr_dim, 
                             num_edge_feats=0,
                             k=cmd_args.sortpooling_k)
         else:
@@ -74,7 +74,8 @@ class Classifier(nn.Module):
             if node_tag_flag == True:
                 concat_tag += batch_graph[i].node_tags
             if node_feat_flag == True:
-                concat_feat += torch.from_numpy(batch_graph[i].node_features)
+                tmp = torch.from_numpy(batch_graph[i].node_features).type('torch.FloatTensor')
+                concat_feat.append(tmp)
         
         if node_tag_flag == True:
             concat_tag = torch.LongTensor(concat_tag).view(-1, 1)

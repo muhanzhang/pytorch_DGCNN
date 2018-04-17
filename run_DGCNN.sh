@@ -3,6 +3,7 @@
 # input arguments
 DATA="${1-DD}"  # MUTAG, ENZYMES, NCI1, NCI109, DD, PTC, PROTEINS, COLLAB, IMDBBINARY, IMDBMULTI
 fold=${2-1}  # which fold as testing data
+test_number=${3-0}  # if specified, use the last test_number graphs as test data
 
 # general settings
 gm=DGCNN  # model
@@ -60,6 +61,10 @@ IMDBMULTI)
   learning_rate=0.0001
   sortpooling_k=0.9
   ;;
+*)
+  num_epochs=500
+  learning_rate=0.00001
+  ;;
 esac
 
 if [ ${fold} == 0 ]; then
@@ -104,5 +109,6 @@ else
       -batch_size $bsize \
       -gm $gm \
       -mode $gpu_or_cpu \
-      -dropout $dropout
+      -dropout $dropout \
+      -test_number ${test_number}
 fi
