@@ -29,7 +29,7 @@ class MLPRegression(nn.Module):
         h1 = F.relu(h1)
 
         pred = self.h2_weights(h1)
-        
+
         if y is not None:
             y = Variable(y)
             mse = F.mse_loss(pred, y)

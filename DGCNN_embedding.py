@@ -48,14 +48,14 @@ class DGCNN(nn.Module):
 
         weights_init(self)
 
-    def forward(self, graph_list, node_feat, edge_feat): 
+    def forward(self, graph_list, node_feat, edge_feat):
         graph_sizes = [graph_list[i].num_nodes for i in range(len(graph_list))]
         node_degs = [torch.Tensor(graph_list[i].degs) + 1 for i in range(len(graph_list))]
         node_degs = torch.cat(node_degs).unsqueeze(1)
 
         n2n_sp, e2n_sp, subg_sp = S2VLIB.PrepareMeanField(graph_list)
-        
-        if type(node_feat) is torch.cuda.FloatTensor:
+
+        if isinstance(node_feat, torch.cuda.FloatTensor):
             n2n_sp = n2n_sp.cuda()
             e2n_sp = e2n_sp.cuda()
             subg_sp = subg_sp.cuda()
@@ -69,7 +69,7 @@ class DGCNN(nn.Module):
         node_degs = Variable(node_degs)
 
         h = self.sortpooling_embedding(node_feat, edge_feat, n2n_sp, e2n_sp, subg_sp, graph_sizes, node_degs)
-        
+
         return h
 
     def sortpooling_embedding(self, node_feat, edge_feat, n2n_sp, e2n_sp, subg_sp, graph_sizes, node_degs):
@@ -96,8 +96,9 @@ class DGCNN(nn.Module):
         ''' sortpooling layer '''
         sort_channel = cur_message_layer[:, -1]
         batch_sortpooling_graphs = torch.zeros(len(graph_sizes), self.k, self.total_latent_dim)
-        if type(node_feat.data) is torch.cuda.FloatTensor:
+        if isinstance(node_feat.data, torch.cuda.FloatTensor):
             batch_sortpooling_graphs = batch_sortpooling_graphs.cuda()
+
         batch_sortpooling_graphs = Variable(batch_sortpooling_graphs)
         accum_count = 0
         for i in range(subg_sp.size()[0]):
@@ -108,8 +109,9 @@ class DGCNN(nn.Module):
             sortpooling_graph = cur_message_layer.index_select(0, topk_indices)
             if k < self.k:
                 to_pad = torch.zeros(self.k-k, self.total_latent_dim)
-                if type(node_feat.data) is torch.cuda.FloatTensor:
+                if isinstance(node_feat.data, torch.cuda.FloatTensor):
                     to_pad = to_pad.cuda()
+
                 to_pad = Variable(to_pad)
                 sortpooling_graph = torch.cat((sortpooling_graph, to_pad), 0)
             batch_sortpooling_graphs[i] = sortpooling_graph
@@ -122,7 +124,7 @@ class DGCNN(nn.Module):
         conv1d_res = self.maxpool1d(conv1d_res)
         conv1d_res = self.conv1d_params2(conv1d_res)
         conv1d_res = F.relu(conv1d_res)
-        
+
         to_dense = conv1d_res.view(len(graph_sizes), -1)
 
         if self.output_dim > 0:
