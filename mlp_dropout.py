@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
+import pdb
 
 sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
 from pytorch_util import weights_init
@@ -29,7 +30,7 @@ class MLPRegression(nn.Module):
         h1 = F.relu(h1)
 
         pred = self.h2_weights(h1)
-        
+
         if y is not None:
             y = Variable(y)
             mse = F.mse_loss(pred, y)
@@ -62,7 +63,7 @@ class MLPClassifier(nn.Module):
             loss = F.nll_loss(logits, y)
 
             pred = logits.data.max(1, keepdim=True)[1]
-            acc = pred.eq(y.data.view_as(pred)).cpu().sum() / float(y.size()[0])
+            acc = pred.eq(y.data.view_as(pred)).cpu().sum().item() / float(y.size()[0])
             return logits, loss, acc
         else:
             return logits
