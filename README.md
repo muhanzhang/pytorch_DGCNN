@@ -1,6 +1,10 @@
 PyTorch DGCNN
 =============
 
+Updates 6/13/2018
+-----------------
+Switch to PyTorch 0.4.0 now. Please update your PyTorch version.
+
 Updates 4/16/2018
 -----------------
 
