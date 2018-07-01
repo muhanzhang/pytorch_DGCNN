@@ -107,6 +107,12 @@ class Classifier(nn.Module):
 
         return self.mlp(embed, labels)
 
+    def output_features(self, batch_graph):
+        node_feat, labels = self.PrepareFeatureLabel(batch_graph)
+        embed = self.s2v(batch_graph, node_feat, None)
+        return embed, labels
+        
+
 def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_args.batch_size):
     total_loss = []
     total_iters = (len(sample_idxes) + (bsize - 1) * (optimizer is None)) // bsize
@@ -170,3 +176,7 @@ if __name__ == '__main__':
 
     with open('result.txt', 'a+') as f:
         f.write(str(test_acc) + '\n')
+
+    features, labels = classifier.output_features(train_graphs)
+    labels = labels.type('torch.FloatTensor')
+    np.savetxt('extracted_features.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
