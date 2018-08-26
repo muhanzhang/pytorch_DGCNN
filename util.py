@@ -27,6 +27,8 @@ cmd_opt.add_argument('-hidden', type=int, default=100, help='dimension of regres
 cmd_opt.add_argument('-max_lv', type=int, default=4, help='max rounds of message passing')
 cmd_opt.add_argument('-learning_rate', type=float, default=0.0001, help='init learning_rate')
 cmd_opt.add_argument('-dropout', type=bool, default=False, help='whether add dropout after dense layer')
+cmd_opt.add_argument('-printAUC', type=bool, default=False, help='whether to print AUC (for binary classification only)')
+cmd_opt.add_argument('-extract_features', type=bool, default=False, help='whether to extract final graph features')
 
 cmd_args, _ = cmd_opt.parse_known_args()
 

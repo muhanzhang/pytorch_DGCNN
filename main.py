@@ -13,6 +13,7 @@ import math
 import pdb
 from DGCNN_embedding import DGCNN
 from mlp_dropout import MLPClassifier
+from sklearn import metrics
 
 sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
 from embedding import EmbedMeanField, EmbedLoopyBP
@@ -117,13 +118,18 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
     total_loss = []
     total_iters = (len(sample_idxes) + (bsize - 1) * (optimizer is None)) // bsize
     pbar = tqdm(range(total_iters), unit='batch')
+    all_targets = []
+    all_scores = []
 
     n_samples = 0
     for pos in pbar:
         selected_idx = sample_idxes[pos * bsize : (pos + 1) * bsize]
 
         batch_graph = [g_list[idx] for idx in selected_idx]
-        _, loss, acc = classifier(batch_graph)
+        targets = [g_list[idx].label for idx in selected_idx]
+        all_targets += targets
+        logits, loss, acc = classifier(batch_graph)
+        all_scores.append(logits[:, 1].detach())  # for binary classification
 
         if optimizer is not None:
             optimizer.zero_grad()
@@ -140,7 +146,13 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
         assert n_samples == len(sample_idxes)
     total_loss = np.array(total_loss)
     avg_loss = np.sum(total_loss, 0) / n_samples
-    return avg_loss, acc
+    all_scores = torch.cat(all_scores).cpu().numpy()
+    all_targets = np.array(all_targets)
+    fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
+    auc = metrics.auc(fpr, tpr)
+    avg_loss = np.concatenate((avg_loss, [auc]))
+    
+    return avg_loss
 
 
 if __name__ == '__main__':
@@ -167,16 +179,28 @@ if __name__ == '__main__':
     for epoch in range(cmd_args.num_epochs):
         random.shuffle(train_idxes)
         classifier.train()
-        avg_loss, _ = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
-        print('\033[92maverage training of epoch %d: loss %.5f acc %.5f\033[0m' % (epoch, avg_loss[0], avg_loss[1]))
+        avg_loss = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
+        if not cmd_args.printAUC:
+            avg_loss[2] = 0.0
+        print('\033[92maverage training of epoch %d: loss %.5f acc %.5f auc %.5f\033[0m' % (epoch, avg_loss[0], avg_loss[1], avg_loss[2]))
 
         classifier.eval()
-        test_loss, test_acc = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
-        print('\033[93maverage test of epoch %d: loss %.5f acc %.5f\033[0m' % (epoch, test_loss[0], test_loss[1]))
+        test_loss = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
+        if not cmd_args.printAUC:
+            test_loss[2] = 0.0
+        print('\033[93maverage test of epoch %d: loss %.5f acc %.5f auc %.5f\033[0m' % (epoch, test_loss[0], test_loss[1], test_loss[2]))
 
-    with open('result.txt', 'a+') as f:
-        f.write(str(test_acc) + '\n')
+    with open('acc_results.txt', 'a+') as f:
+        f.write(str(test_loss[1]) + '\n')
 
-    features, labels = classifier.output_features(train_graphs)
-    labels = labels.type('torch.FloatTensor')
-    np.savetxt('extracted_features.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
+    if cmd_args.printAUC:
+        with open('auc_results.txt', 'a+') as f:
+            f.write(str(test_loss[2]) + '\n')
+
+    if cmd_args.extract_features:
+        features, labels = classifier.output_features(train_graphs)
+        labels = labels.type('torch.FloatTensor')
+        np.savetxt('extracted_features_train.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
+        features, labels = classifier.output_features(test_graphs)
+        labels = labels.type('torch.FloatTensor')
+        np.savetxt('extracted_features_test.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')

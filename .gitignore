@@ -1,4 +1,4 @@
 pytorch_structure2vec-master/
 *.pyc
 result.txt
-extracted_features.txt
+extracted_features*
