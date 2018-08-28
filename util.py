@@ -52,12 +52,16 @@ class S2VGraph(object):
         self.node_features = node_features  # numpy array (node_num * feature_dim)
         self.degs = dict(g.degree).values()
 
-        x, y = zip(*g.edges())
-        self.num_edges = len(x)        
-        self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
-        self.edge_pairs[:, 0] = x
-        self.edge_pairs[:, 1] = y
-        self.edge_pairs = self.edge_pairs.flatten()
+        if len(g.edges()) != 0:
+            x, y = zip(*g.edges())
+            self.num_edges = len(x)        
+            self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
+            self.edge_pairs[:, 0] = x
+            self.edge_pairs[:, 1] = y
+            self.edge_pairs = self.edge_pairs.flatten()
+        else:
+            self.num_edges = 0
+            self.edge_pairs = np.array([])
 
 def load_data():
 
