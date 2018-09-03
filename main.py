@@ -166,6 +166,7 @@ if __name__ == '__main__':
     if cmd_args.sortpooling_k <= 1:
         num_nodes_list = sorted([g.num_nodes for g in train_graphs + test_graphs])
         cmd_args.sortpooling_k = num_nodes_list[int(math.ceil(cmd_args.sortpooling_k * len(num_nodes_list))) - 1]
+        cmd_args.sortpooling_k = max(10, cmd_args.sortpooling_k)
         print('k used in SortPooling is: ' + str(cmd_args.sortpooling_k))
 
     classifier = Classifier()
