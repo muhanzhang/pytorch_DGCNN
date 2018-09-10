@@ -36,8 +36,6 @@ cmd_args.latent_dim = [int(x) for x in cmd_args.latent_dim.split('-')]
 if len(cmd_args.latent_dim) == 1:
     cmd_args.latent_dim = cmd_args.latent_dim[0]
 
-print(cmd_args)
-
 class S2VGraph(object):
     def __init__(self, g, label, node_tags=None, node_features=None):
         '''

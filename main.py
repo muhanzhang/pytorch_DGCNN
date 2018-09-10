@@ -147,6 +147,9 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
     total_loss = np.array(total_loss)
     avg_loss = np.sum(total_loss, 0) / n_samples
     all_scores = torch.cat(all_scores).cpu().numpy()
+    
+    # np.savetxt('test_scores.txt', all_scores)  # output test predictions
+    
     all_targets = np.array(all_targets)
     fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
     auc = metrics.auc(fpr, tpr)
@@ -156,6 +159,7 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
 
 
 if __name__ == '__main__':
+    print(cmd_args)
     random.seed(cmd_args.seed)
     np.random.seed(cmd_args.seed)
     torch.manual_seed(cmd_args.seed)
