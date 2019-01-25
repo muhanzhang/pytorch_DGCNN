@@ -55,7 +55,7 @@ class DGCNN(nn.Module):
 
         n2n_sp, e2n_sp, subg_sp = S2VLIB.PrepareMeanField(graph_list)
 
-        if isinstance(node_feat, torch.cuda.FloatTensor):
+        if torch.cuda.is_available() and isinstance(node_feat, torch.cuda.FloatTensor):
             n2n_sp = n2n_sp.cuda()
             e2n_sp = e2n_sp.cuda()
             subg_sp = subg_sp.cuda()
@@ -96,7 +96,7 @@ class DGCNN(nn.Module):
         ''' sortpooling layer '''
         sort_channel = cur_message_layer[:, -1]
         batch_sortpooling_graphs = torch.zeros(len(graph_sizes), self.k, self.total_latent_dim)
-        if isinstance(node_feat.data, torch.cuda.FloatTensor):
+        if torch.cuda.is_available() and isinstance(node_feat.data, torch.cuda.FloatTensor):
             batch_sortpooling_graphs = batch_sortpooling_graphs.cuda()
 
         batch_sortpooling_graphs = Variable(batch_sortpooling_graphs)
@@ -109,7 +109,7 @@ class DGCNN(nn.Module):
             sortpooling_graph = cur_message_layer.index_select(0, topk_indices)
             if k < self.k:
                 to_pad = torch.zeros(self.k-k, self.total_latent_dim)
-                if isinstance(node_feat.data, torch.cuda.FloatTensor):
+                if torch.cuda.is_available() and isinstance(node_feat.data, torch.cuda.FloatTensor):
                     to_pad = to_pad.cuda()
 
                 to_pad = Variable(to_pad)
