@@ -1,19 +1,12 @@
 PyTorch DGCNN
 =============
 
-Updates 6/13/2018
------------------
-Switch to PyTorch 0.4.0 now. Please update your PyTorch version.
-
-Updates 4/16/2018
------------------
-
-Added support to multi-dimensional continuous node features. Added support to use your own datasets. 
-
 About
 -----
 
 PyTorch implementation of DGCNN (Deep Graph Convolutional Neural Network). Check https://github.com/muhanzhang/DGCNN for more information.
+
+Requirements: python 2.7 or python 3.6; pytorch >= 0.4.0
 
 Installation
 ------------
