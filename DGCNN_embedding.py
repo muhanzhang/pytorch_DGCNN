@@ -30,7 +30,7 @@ class DGCNN(nn.Module):
         conv1d_kws[0] = self.total_latent_dim
 
         self.conv_params = nn.ModuleList()
-        self.conv_params.append(nn.Linear(num_node_feats, latent_dim[0]))
+        self.conv_params.append(nn.Linear(num_node_feats + num_edge_feats, latent_dim[0]))
         for i in range(1, len(latent_dim)):
             self.conv_params.append(nn.Linear(latent_dim[i-1], latent_dim[i]))
 
@@ -41,8 +41,8 @@ class DGCNN(nn.Module):
         dense_dim = int((k - 2) / 2 + 1)
         self.dense_dim = (dense_dim - conv1d_kws[1] + 1) * conv1d_channels[1]
 
-        if num_edge_feats > 0:
-            self.w_e2l = nn.Linear(num_edge_feats, latent_dim)
+        #if num_edge_feats > 0:
+        #    self.w_e2l = nn.Linear(num_edge_feats, num_node_feats)
         if output_dim > 0:
             self.out_params = nn.Linear(self.dense_dim, output_dim)
 
@@ -63,6 +63,8 @@ class DGCNN(nn.Module):
         node_feat = Variable(node_feat)
         if edge_feat is not None:
             edge_feat = Variable(edge_feat)
+            if torch.cuda.is_available() and isinstance(node_feat, torch.cuda.FloatTensor):
+                edge_feat = edge_feat.cuda()
         n2n_sp = Variable(n2n_sp)
         e2n_sp = Variable(e2n_sp)
         subg_sp = Variable(subg_sp)
@@ -75,7 +77,8 @@ class DGCNN(nn.Module):
     def sortpooling_embedding(self, node_feat, edge_feat, n2n_sp, e2n_sp, subg_sp, graph_sizes, node_degs):
         ''' if exists edge feature, concatenate to node feature vector '''
         if edge_feat is not None:
-            input_edge_linear = self.w_e2l(edge_feat)
+            #input_edge_linear = self.w_e2l(edge_feat)
+            input_edge_linear = edge_feat
             e2npool_input = gnn_spmm(e2n_sp, input_edge_linear)
             node_feat = torch.cat([node_feat, e2npool_input], 1)
 

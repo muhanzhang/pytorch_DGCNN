@@ -60,6 +60,52 @@ class S2VGraph(object):
         else:
             self.num_edges = 0
             self.edge_pairs = np.array([])
+        
+        # see if there are edge features
+        self.edge_features = None
+        if nx.get_edge_attributes(g, 'features'):  
+            # make sure edges have an attribute 'features' (1 * feature_dim numpy array)
+            edge_features = nx.get_edge_attributes(g, 'features')
+            assert(type(edge_features.values()[0]) == np.ndarray) 
+            # need to rearrange edge_features using the e2n edge order
+            edge_features = {(min(x, y), max(x, y)): z for (x, y), z in edge_features.items()}
+            keys = sorted(edge_features)
+            self.edge_features = []
+            for edge in keys:
+                self.edge_features.append(edge_features[edge])
+                self.edge_features.append(edge_features[edge])  # add reversed edges
+            self.edge_features = np.concatenate(self.edge_features, 0)
+
+
+
+class BiGraph(S2VGraph):
+    def __init__(self, g, label, node_tags=None, u_features=None, v_features=None):
+        '''
+            Bipartite graph class for recommender systems
+            g: a networkx graph, nodes should have an attribute 'bipartite'='u'/'v',
+               edges should have an attribute 'type' (representing ratings), 
+               nodes 0,...,Nu-1  belong to class 'u'; Nu,...,Nu+Nv-1 belong to class 'v'
+            label: a graph label to predict (can be continuous)
+            node_tags: a list of integer node tags
+            u_features/v_features: numpy arrays of continuous node features for 'u'/'v'
+        '''
+        self.num_nodes = len(node_tags)
+        self.node_tags = node_tags
+        self.label = label
+        self.node_features = node_features  # numpy array (node_num * feature_dim)
+        self.degs = list(dict(g.degree).values())
+
+        if len(g.edges()) != 0:
+            x, y = zip(*g.edges())
+            self.num_edges = len(x)        
+            self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
+            self.edge_pairs[:, 0] = x
+            self.edge_pairs[:, 1] = y
+            self.edge_pairs = self.edge_pairs.flatten()
+        else:
+            self.num_edges = 0
+            self.edge_pairs = np.array([])
+
 
 def load_data():
 
@@ -116,6 +162,7 @@ def load_data():
         g.label = label_dict[g.label]
     cmd_args.num_class = len(label_dict)
     cmd_args.feat_dim = len(feat_dict) # maximum node label (tag)
+    cmd_args.edge_feat_dim = 0
     if node_feature_flag == True:
         cmd_args.attr_dim = node_features.shape[1] # dim of node features (attributes)
     else:

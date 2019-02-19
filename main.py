@@ -37,13 +37,13 @@ class Classifier(nn.Module):
             self.s2v = model(latent_dim=cmd_args.latent_dim,
                             output_dim=cmd_args.out_dim,
                             num_node_feats=cmd_args.feat_dim+cmd_args.attr_dim,
-                            num_edge_feats=0,
+                            num_edge_feats=cmd_args.edge_feat_dim,
                             k=cmd_args.sortpooling_k)
         else:
             self.s2v = model(latent_dim=cmd_args.latent_dim,
                             output_dim=cmd_args.out_dim,
                             num_node_feats=cmd_args.feat_dim,
-                            num_edge_feats=0,
+                            num_edge_feats=cmd_args.edge_feat_dim,
                             max_lv=cmd_args.max_lv)
         out_dim = cmd_args.out_dim
         if out_dim == 0:
@@ -69,6 +69,12 @@ class Classifier(nn.Module):
         else:
             node_feat_flag = False
 
+        if batch_graph[0].edge_features is not None:
+            edge_feat_flag = True
+            concat_edge_feat = []
+        else:
+            edge_feat_flag = False
+
         for i in range(len(batch_graph)):
             labels[i] = batch_graph[i].label
             n_nodes += batch_graph[i].num_nodes
@@ -77,6 +83,9 @@ class Classifier(nn.Module):
             if node_feat_flag == True:
                 tmp = torch.from_numpy(batch_graph[i].node_features).type('torch.FloatTensor')
                 concat_feat.append(tmp)
+            if edge_feat_flag == True:
+                tmp = torch.from_numpy(batch_graph[i].edge_features).type('torch.FloatTensor')
+                concat_edge_feat.append(tmp)
 
         if node_tag_flag == True:
             concat_tag = torch.LongTensor(concat_tag).view(-1, 1)
@@ -95,22 +104,36 @@ class Classifier(nn.Module):
             pass
         else:
             node_feat = torch.ones(n_nodes, 1)  # use all-one vector as node features
+        
+        if edge_feat_flag == True:
+            edge_feat = torch.cat(concat_edge_feat, 0)
 
         if cmd_args.mode == 'gpu':
             node_feat = node_feat.cuda()
             labels = labels.cuda()
 
+        if edge_feat_flag == True:
+            return node_feat, edge_feat, labels
         return node_feat, labels
 
     def forward(self, batch_graph):
-        node_feat, labels = self.PrepareFeatureLabel(batch_graph)
-        embed = self.s2v(batch_graph, node_feat, None)
-
+        feature_label = self.PrepareFeatureLabel(batch_graph)
+        if len(feature_label) == 2:
+            node_feat, labels = feature_label
+            edge_feat = None
+        elif len(feature_label) == 3:
+            node_feat, edge_feat, labels = feature_label
+        embed = self.s2v(batch_graph, node_feat, edge_feat)
         return self.mlp(embed, labels)
 
     def output_features(self, batch_graph):
-        node_feat, labels = self.PrepareFeatureLabel(batch_graph)
-        embed = self.s2v(batch_graph, node_feat, None)
+        feature_label = self.PrepareFeatureLabel(batch_graph)
+        if len(feature_label) == 2:
+            node_feat, labels = feature_label
+            edge_feat = None
+        elif len(feature_label) == 3:
+            node_feat, edge_feat, labels = feature_label
+        embed = self.s2v(batch_graph, node_feat, edge_feat)
         return embed, labels
         
 
