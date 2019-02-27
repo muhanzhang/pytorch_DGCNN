@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
+import pdb
 
 sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
 from s2v_lib import S2VLIB
@@ -18,7 +19,7 @@ from pytorch_util import weights_init, gnn_spmm
 
 
 class DGCNN(nn.Module):
-    def __init__(self, output_dim, num_node_feats, num_edge_feats, latent_dim=[32, 32, 32, 1], k=30, conv1d_channels=[16, 32], conv1d_kws=[0, 5]):
+    def __init__(self, output_dim, num_node_feats, num_edge_feats, latent_dim=[32, 32, 32, 1], k=30, conv1d_channels=[16, 32], conv1d_kws=[0, 5], conv1d_activation='ReLU'):
         print('Initializing DGCNN')
         super(DGCNN, self).__init__()
         self.latent_dim = latent_dim
@@ -45,6 +46,8 @@ class DGCNN(nn.Module):
         #    self.w_e2l = nn.Linear(num_edge_feats, num_node_feats)
         if output_dim > 0:
             self.out_params = nn.Linear(self.dense_dim, output_dim)
+
+        self.conv1d_activation = eval('nn.{}()'.format(conv1d_activation))
 
         weights_init(self)
 
@@ -90,7 +93,7 @@ class DGCNN(nn.Module):
             n2npool = gnn_spmm(n2n_sp, cur_message_layer) + cur_message_layer  # Y = (A + I) * X
             node_linear = self.conv_params[lv](n2npool)  # Y = Y * W
             normalized_linear = node_linear.div(node_degs)  # Y = D^-1 * Y
-            cur_message_layer = F.tanh(normalized_linear)
+            cur_message_layer = torch.tanh(normalized_linear)
             cat_message_layers.append(cur_message_layer)
             lv += 1
 
@@ -123,17 +126,17 @@ class DGCNN(nn.Module):
         ''' traditional 1d convlution and dense layers '''
         to_conv1d = batch_sortpooling_graphs.view((-1, 1, self.k * self.total_latent_dim))
         conv1d_res = self.conv1d_params1(to_conv1d)
-        conv1d_res = F.relu(conv1d_res)
+        conv1d_res = self.conv1d_activation(conv1d_res)
         conv1d_res = self.maxpool1d(conv1d_res)
         conv1d_res = self.conv1d_params2(conv1d_res)
-        conv1d_res = F.relu(conv1d_res)
+        conv1d_res = self.conv1d_activation(conv1d_res)
 
         to_dense = conv1d_res.view(len(graph_sizes), -1)
 
         if self.output_dim > 0:
             out_linear = self.out_params(to_dense)
-            reluact_fp = F.relu(out_linear)
+            reluact_fp = self.conv1d_activation(out_linear)
         else:
             reluact_fp = to_dense
 
-        return F.relu(reluact_fp)
+        return self.conv1d_activation(reluact_fp)
