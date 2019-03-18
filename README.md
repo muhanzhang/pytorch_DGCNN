@@ -11,21 +11,17 @@ Requirements: python 2.7 or python 3.6; pytorch >= 0.4.0
 Installation
 ------------
 
-This implementation is based on Hanjun Dai's PyTorch version of structure2vec. Please first unzip the pytorch_structure2vec-master.zip by
-
-    unzip pytorch_structure2vec-master.zip
-
-Then, under the "pytorch_structure2vec-master/s2vlib/" directory, type
+This implementation is based on Hanjun Dai's structure2vec graph backend. Under the "lib/" directory, type
 
     make -j4
 
-to build the necessary c++ backend.
+to compile the necessary c++ files.
 
 After that, under the root directory of this repository, type
 
     ./run_DGCNN.sh
 
-to run DGCNN on dataset DD with default settings.
+to run DGCNN on dataset MUTAG with the default setting.
 
 Or type 
 

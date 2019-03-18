@@ -11,7 +11,7 @@ import argparse
 
 cmd_opt = argparse.ArgumentParser(description='Argparser for graph_classification')
 cmd_opt.add_argument('-mode', default='cpu', help='cpu/gpu')
-cmd_opt.add_argument('-gm', default='mean_field', help='mean_field/loopy_bp')
+cmd_opt.add_argument('-gm', default='DGCNN', help='gnn model to use')
 cmd_opt.add_argument('-data', default=None, help='data folder name')
 cmd_opt.add_argument('-batch_size', type=int, default=50, help='minibatch size')
 cmd_opt.add_argument('-seed', type=int, default=1, help='seed')
@@ -23,8 +23,8 @@ cmd_opt.add_argument('-num_epochs', type=int, default=1000, help='number of epoc
 cmd_opt.add_argument('-latent_dim', type=str, default='64', help='dimension(s) of latent layers')
 cmd_opt.add_argument('-sortpooling_k', type=float, default=30, help='number of nodes kept after SortPooling')
 cmd_opt.add_argument('-conv1d_activation', type=str, default='ReLU', help='which nn activation layer to use')
-cmd_opt.add_argument('-out_dim', type=int, default=1024, help='s2v output size')
-cmd_opt.add_argument('-hidden', type=int, default=100, help='dimension of regression')
+cmd_opt.add_argument('-out_dim', type=int, default=1024, help='graph embedding output size')
+cmd_opt.add_argument('-hidden', type=int, default=100, help='dimension of mlp hidden layer')
 cmd_opt.add_argument('-max_lv', type=int, default=4, help='max rounds of message passing')
 cmd_opt.add_argument('-learning_rate', type=float, default=0.0001, help='init learning_rate')
 cmd_opt.add_argument('-dropout', type=bool, default=False, help='whether add dropout after dense layer')
@@ -37,7 +37,7 @@ cmd_args.latent_dim = [int(x) for x in cmd_args.latent_dim.split('-')]
 if len(cmd_args.latent_dim) == 1:
     cmd_args.latent_dim = cmd_args.latent_dim[0]
 
-class S2VGraph(object):
+class GNNGraph(object):
     def __init__(self, g, label, node_tags=None, node_features=None):
         '''
             g: a networkx graph
@@ -76,36 +76,6 @@ class S2VGraph(object):
                 self.edge_features.append(edge_features[edge])
                 self.edge_features.append(edge_features[edge])  # add reversed edges
             self.edge_features = np.concatenate(self.edge_features, 0)
-
-
-
-class BiGraph(S2VGraph):
-    def __init__(self, g, label, node_tags=None, u_features=None, v_features=None):
-        '''
-            Bipartite graph class for recommender systems
-            g: a networkx graph, nodes should have an attribute 'bipartite'='u'/'v',
-               edges should have an attribute 'type' (representing ratings), 
-               nodes 0,...,Nu-1  belong to class 'u'; Nu,...,Nu+Nv-1 belong to class 'v'
-            label: a graph label to predict (can be continuous)
-            node_tags: a list of integer node tags
-            u_features/v_features: numpy arrays of continuous node features for 'u'/'v'
-        '''
-        self.num_nodes = len(node_tags)
-        self.node_tags = node_tags
-        self.label = label
-        self.node_features = node_features  # numpy array (node_num * feature_dim)
-        self.degs = list(dict(g.degree).values())
-
-        if len(g.edges()) != 0:
-            x, y = zip(*g.edges())
-            self.num_edges = len(x)        
-            self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
-            self.edge_pairs[:, 0] = x
-            self.edge_pairs[:, 1] = y
-            self.edge_pairs = self.edge_pairs.flatten()
-        else:
-            self.num_edges = 0
-            self.edge_pairs = np.array([])
 
 
 def load_data():
@@ -158,7 +128,7 @@ def load_data():
 
             #assert len(g.edges()) * 2 == n_edges  (some graphs in COLLAB have self-loops, ignored here)
             assert len(g) == n
-            g_list.append(S2VGraph(g, l, node_tags, node_features))
+            g_list.append(GNNGraph(g, l, node_tags, node_features))
     for g in g_list:
         g.label = label_dict[g.label]
     cmd_args.num_class = len(label_dict)

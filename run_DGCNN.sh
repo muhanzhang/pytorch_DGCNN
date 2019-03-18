@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # input arguments
-DATA="${1-DD}"  # MUTAG, ENZYMES, NCI1, NCI109, DD, PTC, PROTEINS, COLLAB, IMDBBINARY, IMDBMULTI
+DATA="${1-MUTAG}"  # MUTAG, ENZYMES, NCI1, NCI109, DD, PTC, PROTEINS, COLLAB, IMDBBINARY, IMDBMULTI
 fold=${2-1}  # which fold as testing data
 test_number=${3-0}  # if specified, use the last test_number graphs as test data
 
@@ -68,7 +68,6 @@ IMDBMULTI)
 esac
 
 if [ ${fold} == 0 ]; then
-  rm acc_results.txt
   echo "Running 10-fold cross validation"
   start=`date +%s`
   for i in $(seq 1 10)
@@ -94,7 +93,7 @@ if [ ${fold} == 0 ]; then
   echo "The accuracy results for ${DATA} are as follows:"
   cat acc_results.txt
   echo "Average accuracy is"
-  cat acc_results.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
+  tail 10 acc_results.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
 else
   CUDA_VISIBLE_DEVICES=${GPU} python main.py \
       -seed 1 \

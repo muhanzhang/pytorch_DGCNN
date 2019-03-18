@@ -13,7 +13,7 @@ import torch.optim as optim
 from tqdm import tqdm
 import pdb
 
-sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
+sys.path.append('%s/lib' % os.path.dirname(os.path.realpath(__file__)))
 from pytorch_util import weights_init
 
 class MLPRegression(nn.Module):

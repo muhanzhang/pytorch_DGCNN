@@ -14,43 +14,29 @@ import pdb
 from DGCNN_embedding import DGCNN
 from mlp_dropout import MLPClassifier, MLPRegression
 from sklearn import metrics
-
-sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
-from embedding import EmbedMeanField, EmbedLoopyBP
-
 from util import cmd_args, load_data
 
 class Classifier(nn.Module):
     def __init__(self, regression=False):
         super(Classifier, self).__init__()
         self.regression = regression
-        if cmd_args.gm == 'mean_field':
-            model = EmbedMeanField
-        elif cmd_args.gm == 'loopy_bp':
-            model = EmbedLoopyBP
-        elif cmd_args.gm == 'DGCNN':
+        if cmd_args.gm == 'DGCNN':
             model = DGCNN
         else:
             print('unknown gm %s' % cmd_args.gm)
             sys.exit()
 
         if cmd_args.gm == 'DGCNN':
-            self.s2v = model(latent_dim=cmd_args.latent_dim,
+            self.gnn = model(latent_dim=cmd_args.latent_dim,
                             output_dim=cmd_args.out_dim,
                             num_node_feats=cmd_args.feat_dim+cmd_args.attr_dim,
                             num_edge_feats=cmd_args.edge_feat_dim,
                             k=cmd_args.sortpooling_k, 
                             conv1d_activation=cmd_args.conv1d_activation)
-        else:
-            self.s2v = model(latent_dim=cmd_args.latent_dim,
-                            output_dim=cmd_args.out_dim,
-                            num_node_feats=cmd_args.feat_dim,
-                            num_edge_feats=cmd_args.edge_feat_dim,
-                            max_lv=cmd_args.max_lv)
         out_dim = cmd_args.out_dim
         if out_dim == 0:
             if cmd_args.gm == 'DGCNN':
-                out_dim = self.s2v.dense_dim
+                out_dim = self.gnn.dense_dim
             else:
                 out_dim = cmd_args.latent_dim
         self.mlp = MLPClassifier(input_size=out_dim, hidden_size=cmd_args.hidden, num_class=cmd_args.num_class, with_dropout=cmd_args.dropout)
@@ -133,7 +119,7 @@ class Classifier(nn.Module):
             edge_feat = None
         elif len(feature_label) == 3:
             node_feat, edge_feat, labels = feature_label
-        embed = self.s2v(batch_graph, node_feat, edge_feat)
+        embed = self.gnn(batch_graph, node_feat, edge_feat)
         return self.mlp(embed, labels)
 
     def output_features(self, batch_graph):
@@ -143,7 +129,7 @@ class Classifier(nn.Module):
             edge_feat = None
         elif len(feature_label) == 3:
             node_feat, edge_feat, labels = feature_label
-        embed = self.s2v(batch_graph, node_feat, edge_feat)
+        embed = self.gnn(batch_graph, node_feat, edge_feat)
         return embed, labels
         
 
