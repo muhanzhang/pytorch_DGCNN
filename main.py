@@ -12,7 +12,7 @@ import torch.optim as optim
 import math
 import pdb
 from DGCNN_embedding import DGCNN
-from mlp_dropout import MLPClassifier
+from mlp_dropout import MLPClassifier, MLPRegression
 from sklearn import metrics
 
 sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
@@ -21,8 +21,9 @@ from embedding import EmbedMeanField, EmbedLoopyBP
 from util import cmd_args, load_data
 
 class Classifier(nn.Module):
-    def __init__(self):
+    def __init__(self, regression=False):
         super(Classifier, self).__init__()
+        self.regression = regression
         if cmd_args.gm == 'mean_field':
             model = EmbedMeanField
         elif cmd_args.gm == 'loopy_bp':
@@ -38,7 +39,8 @@ class Classifier(nn.Module):
                             output_dim=cmd_args.out_dim,
                             num_node_feats=cmd_args.feat_dim+cmd_args.attr_dim,
                             num_edge_feats=cmd_args.edge_feat_dim,
-                            k=cmd_args.sortpooling_k)
+                            k=cmd_args.sortpooling_k, 
+                            conv1d_activation=cmd_args.conv1d_activation)
         else:
             self.s2v = model(latent_dim=cmd_args.latent_dim,
                             output_dim=cmd_args.out_dim,
@@ -52,9 +54,14 @@ class Classifier(nn.Module):
             else:
                 out_dim = cmd_args.latent_dim
         self.mlp = MLPClassifier(input_size=out_dim, hidden_size=cmd_args.hidden, num_class=cmd_args.num_class, with_dropout=cmd_args.dropout)
+        if regression:
+            self.mlp = MLPRegression(input_size=out_dim, hidden_size=cmd_args.hidden, with_dropout=cmd_args.dropout)
 
     def PrepareFeatureLabel(self, batch_graph):
-        labels = torch.LongTensor(len(batch_graph))
+        if self.regression:
+            labels = torch.FloatTensor(len(batch_graph))
+        else:
+            labels = torch.LongTensor(len(batch_graph))
         n_nodes = 0
 
         if batch_graph[0].node_tags is not None:
@@ -69,7 +76,7 @@ class Classifier(nn.Module):
         else:
             node_feat_flag = False
 
-        if batch_graph[0].edge_features is not None:
+        if cmd_args.edge_feat_dim > 0:
             edge_feat_flag = True
             concat_edge_feat = []
         else:
@@ -84,8 +91,9 @@ class Classifier(nn.Module):
                 tmp = torch.from_numpy(batch_graph[i].node_features).type('torch.FloatTensor')
                 concat_feat.append(tmp)
             if edge_feat_flag == True:
-                tmp = torch.from_numpy(batch_graph[i].edge_features).type('torch.FloatTensor')
-                concat_edge_feat.append(tmp)
+                if batch_graph[i].edge_features is not None:  # in case no edge in graph[i]
+                    tmp = torch.from_numpy(batch_graph[i].edge_features).type('torch.FloatTensor')
+                    concat_edge_feat.append(tmp)
 
         if node_tag_flag == True:
             concat_tag = torch.LongTensor(concat_tag).view(-1, 1)
@@ -111,6 +119,8 @@ class Classifier(nn.Module):
         if cmd_args.mode == 'gpu':
             node_feat = node_feat.cuda()
             labels = labels.cuda()
+            if edge_feat_flag == True:
+                edge_feat = edge_feat.cuda()
 
         if edge_feat_flag == True:
             return node_feat, edge_feat, labels
@@ -151,18 +161,26 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
         batch_graph = [g_list[idx] for idx in selected_idx]
         targets = [g_list[idx].label for idx in selected_idx]
         all_targets += targets
-        logits, loss, acc = classifier(batch_graph)
-        all_scores.append(logits[:, 1].detach())  # for binary classification
+        if classifier.regression:
+            pred, mae, loss = classifier(batch_graph)
+            all_scores.append(pred.cpu().detach())  # for binary classification
+        else:
+            logits, loss, acc = classifier(batch_graph)
+            all_scores.append(logits[:, 1].cpu().detach())  # for binary classification
 
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        loss = loss.data.cpu().numpy()
-        pbar.set_description('loss: %0.5f acc: %0.5f' % (loss, acc) )
+        loss = loss.data.cpu().detach().numpy()
+        if classifier.regression:
+            pbar.set_description('MSE_loss: %0.5f MAE_loss: %0.5f' % (loss, mae) )
+            total_loss.append( np.array([loss, mae]) * len(selected_idx))
+        else:
+            pbar.set_description('loss: %0.5f acc: %0.5f' % (loss, acc) )
+            total_loss.append( np.array([loss, acc]) * len(selected_idx))
 
-        total_loss.append( np.array([loss, acc]) * len(selected_idx))
 
         n_samples += len(selected_idx)
     if optimizer is None:
@@ -173,10 +191,11 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
     
     # np.savetxt('test_scores.txt', all_scores)  # output test predictions
     
-    all_targets = np.array(all_targets)
-    fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
-    auc = metrics.auc(fpr, tpr)
-    avg_loss = np.concatenate((avg_loss, [auc]))
+    if not classifier.regression:
+        all_targets = np.array(all_targets)
+        fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
+        auc = metrics.auc(fpr, tpr)
+        avg_loss = np.concatenate((avg_loss, [auc]))
     
     return avg_loss
 

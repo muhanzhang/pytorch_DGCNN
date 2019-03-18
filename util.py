@@ -22,6 +22,7 @@ cmd_opt.add_argument('-test_number', type=int, default=0, help='if specified, wi
 cmd_opt.add_argument('-num_epochs', type=int, default=1000, help='number of epochs')
 cmd_opt.add_argument('-latent_dim', type=str, default='64', help='dimension(s) of latent layers')
 cmd_opt.add_argument('-sortpooling_k', type=float, default=30, help='number of nodes kept after SortPooling')
+cmd_opt.add_argument('-conv1d_activation', type=str, default='ReLU', help='which nn activation layer to use')
 cmd_opt.add_argument('-out_dim', type=int, default=1024, help='s2v output size')
 cmd_opt.add_argument('-hidden', type=int, default=100, help='dimension of regression')
 cmd_opt.add_argument('-max_lv', type=int, default=4, help='max rounds of message passing')

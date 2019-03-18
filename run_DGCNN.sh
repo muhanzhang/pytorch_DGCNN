@@ -68,7 +68,7 @@ IMDBMULTI)
 esac
 
 if [ ${fold} == 0 ]; then
-  rm result.txt
+  rm acc_results.txt
   echo "Running 10-fold cross validation"
   start=`date +%s`
   for i in $(seq 1 10)

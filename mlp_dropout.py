@@ -17,11 +17,12 @@ sys.path.append('%s/pytorch_structure2vec-master/s2v_lib' % os.path.dirname(os.p
 from pytorch_util import weights_init
 
 class MLPRegression(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, with_dropout=False):
         super(MLPRegression, self).__init__()
 
         self.h1_weights = nn.Linear(input_size, hidden_size)
         self.h2_weights = nn.Linear(hidden_size, 1)
+        self.with_dropout = with_dropout
 
         weights_init(self)
 
@@ -29,12 +30,15 @@ class MLPRegression(nn.Module):
         h1 = self.h1_weights(x)
         h1 = F.relu(h1)
 
-        pred = self.h2_weights(h1)
+        if self.with_dropout:
+            h1 = F.dropout(h1, training=self.training)
+        pred = self.h2_weights(h1)[:, 0]
 
         if y is not None:
             y = Variable(y)
             mse = F.mse_loss(pred, y)
             mae = F.l1_loss(pred, y)
+            mae = mae.cpu().detach()
             return pred, mae, mse
         else:
             return pred
