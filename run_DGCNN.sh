@@ -93,7 +93,7 @@ if [ ${fold} == 0 ]; then
   echo "The accuracy results for ${DATA} are as follows:"
   cat acc_results.txt
   echo "Average accuracy is"
-  tail 10 acc_results.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
+  tail -10 acc_results.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
 else
   CUDA_VISIBLE_DEVICES=${GPU} python main.py \
       -seed 1 \
