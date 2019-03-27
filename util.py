@@ -113,7 +113,7 @@ def load_data():
                     feat_dict[row[0]] = mapped
                 node_tags.append(feat_dict[row[0]])
 
-                if tmp > len(row):
+                if attr is not None:
                     node_features.append(attr)
 
                 n_edges += row[1]
