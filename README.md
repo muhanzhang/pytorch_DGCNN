@@ -17,6 +17,17 @@ This implementation is based on Hanjun Dai's structure2vec graph backend. Under 
 
 to compile the necessary c++ files.
 
+Create a virtual environment and activate it
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Install required dependencies
+```bash
+pip install -r requirements.txt
+```
+
 After that, under the root directory of this repository, type
 
     ./run_DGCNN.sh
