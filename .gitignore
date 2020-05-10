@@ -1,6 +1,5 @@
 *.pyc
 result.txt
 extracted_features*
-acc_results.txt
-auc_results.txt
+*results.txt
 .*

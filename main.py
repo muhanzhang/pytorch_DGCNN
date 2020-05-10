@@ -177,11 +177,13 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
     
     # np.savetxt('test_scores.txt', all_scores)  # output test predictions
     
-    if not classifier.regression:
+    if not classifier.regression and cmd_args.printAUC:
         all_targets = np.array(all_targets)
         fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
         auc = metrics.auc(fpr, tpr)
         avg_loss = np.concatenate((avg_loss, [auc]))
+    else:
+        avg_loss = np.concatenate((avg_loss, [0.0]))
     
     return avg_loss
 
@@ -223,11 +225,11 @@ if __name__ == '__main__':
             test_loss[2] = 0.0
         print('\033[93maverage test of epoch %d: loss %.5f acc %.5f auc %.5f\033[0m' % (epoch, test_loss[0], test_loss[1], test_loss[2]))
 
-    with open('acc_results.txt', 'a+') as f:
+    with open(cmd_args.data + '_acc_results.txt', 'a+') as f:
         f.write(str(test_loss[1]) + '\n')
 
     if cmd_args.printAUC:
-        with open('auc_results.txt', 'a+') as f:
+        with open(cmd_args.data + '_auc_results.txt', 'a+') as f:
             f.write(str(test_loss[2]) + '\n')
 
     if cmd_args.extract_features:

@@ -91,9 +91,9 @@ if [ ${fold} == 0 ]; then
   echo "End of cross-validation"
   echo "The total running time is $[stop - start] seconds."
   echo "The accuracy results for ${DATA} are as follows:"
-  cat acc_results.txt
-  echo "Average accuracy is"
-  tail -10 acc_results.txt | awk '{ sum += $1; n++ } END { if (n > 0) print sum / n; }'
+  tail -10 ${DATA}_acc_results.txt
+  echo "Average accuracy and std are"
+  tail -10 ${DATA}_acc_results.txt | awk '{ sum += $1; sum2 += $1*$1; n++ } END { if (n > 0) print sum / n; print sqrt(sum2 / n - (sum/n) * (sum/n)); }'
 else
   CUDA_VISIBLE_DEVICES=${GPU} python main.py \
       -seed 1 \
