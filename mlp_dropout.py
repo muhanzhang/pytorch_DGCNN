@@ -9,6 +9,7 @@ from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import accuracy_score
 import torch.optim as optim
 from tqdm import tqdm
 import pdb
@@ -53,7 +54,7 @@ class MLPClassifier(nn.Module):
 
         weights_init(self)
 
-    def forward(self, x, y = None):
+    def forward(self, x, y = None, groups = None):
         h1 = self.h1_weights(x)
         h1 = F.relu(h1)
         if self.with_dropout:
@@ -67,7 +68,31 @@ class MLPClassifier(nn.Module):
             loss = F.nll_loss(logits, y)
 
             pred = logits.data.max(1, keepdim=True)[1]
-            acc = pred.eq(y.data.view_as(pred)).cpu().sum().item() / float(y.size()[0])
-            return logits, loss, acc
+
+            head_preds = []
+            head_y = []
+            med_preds = []
+            med_y = []
+            tail_preds = []
+            tail_y = []
+
+            for idx, id in enumerate(groups):
+                if id == 2:
+                    head_preds.append(pred[idx].cpu().item())
+                    head_y.append(y.data[idx].cpu().item())
+                elif id == 1:
+                    med_preds.append(pred[idx].cpu().item())
+                    med_y.append(y.data[idx].cpu().item())
+                elif id == 0:
+                    tail_preds.append(pred[idx].cpu().item())
+                    tail_y.append(y.data[idx].cpu().item())
+                else:
+                    assert False
+
+            # print(f"Head ACC: {accuracy_score(head_y, head_preds)}, Medium ACC: {accuracy_score(head_y, head_preds)}, "
+            #       f"Tail ACC: {accuracy_score(tail_y, tail_preds)}")
+            # acc = pred.eq(y.data.view_as(pred)).cpu().sum().item() / float(y.size()[0])
+            return logits, loss, [accuracy_score(head_y, head_preds), accuracy_score(head_y, head_preds),
+                                  accuracy_score(tail_y, tail_preds)]
         else:
             return logits

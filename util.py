@@ -8,6 +8,7 @@ import os
 import networkx as nx
 import pdb
 import argparse
+import torch
 
 cmd_opt = argparse.ArgumentParser(description='Argparser for graph_classification')
 cmd_opt.add_argument('-mode', default='cpu', help='cpu/gpu')
@@ -51,6 +52,7 @@ class GNNGraph(object):
         self.label = label
         self.node_features = node_features  # numpy array (node_num * feature_dim)
         self.degs = list(dict(g.degree).values())
+        self.nodegroup = None
 
         if len(g.edges()) != 0:
             x, y = zip(*g.edges())
@@ -80,6 +82,17 @@ class GNNGraph(object):
 
 
 def load_data():
+
+    if cmd_args.data == "PROTEINS":
+        K = [0, 371, 742, 1113]
+    elif cmd_args.data == "PTC":
+        K = [0, 115, 230, 344]
+    elif cmd_args.data == "IMDBBINARY":
+        K = [0, 333, 666, 1000]
+    elif cmd_args.data == "DD":
+        K = [0, 393, 785, 1178]
+    elif cmd_args.data == "FRANK":
+        K =[0, 1445, 2890, 4337]
 
     print('loading data')
     g_list = []
@@ -130,8 +143,32 @@ def load_data():
             #assert len(g.edges()) * 2 == n_edges  (some graphs in COLLAB have self-loops, ignored here)
             assert len(g) == n
             g_list.append(GNNGraph(g, l, node_tags, node_features))
+    nodes = list()
     for g in g_list:
         g.label = label_dict[g.label]
+
+    nodes = torch.zeros(len(g_list))
+    for i in range(len(g_list)):
+        nodes[i] = g_list[i].num_nodes
+
+    _, ind = torch.sort(nodes, descending=True)
+
+    print(ind)
+
+    head = 0
+    med = 0
+    tail = 0
+
+    for i in ind[K[0]:K[1]]:
+        head += 1
+        g_list[i].nodegroup = 2
+    for i in ind[K[1]:K[2]]:
+        med += 1
+        g_list[i].nodegroup = 1
+    for i in ind[K[2]:K[3]]:
+        tail += 1
+        g_list[i].nodegroup = 0
+
     cmd_args.num_class = len(label_dict)
     cmd_args.feat_dim = len(feat_dict) # maximum node label (tag)
     cmd_args.edge_feat_dim = 0
@@ -142,13 +179,24 @@ def load_data():
 
     print('# classes: %d' % cmd_args.num_class)
     print('# maximum node tag: %d' % cmd_args.feat_dim)
+    print('# Number of Head Graphs: ', head)
+    print('# Number of Medium Graphs: ', med)
+    print('# Number of Tail Graphs: ', tail)
 
-    if cmd_args.test_number == 0:
-        train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
-        test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
-        return [g_list[i] for i in train_idxes], [g_list[i] for i in test_idxes]
-    else:
-        return g_list[: n_g - cmd_args.test_number], g_list[n_g - cmd_args.test_number :]
+    assert n_g == head + tail + med
+
+    random.shuffle(g_list)
+
+    train_graphs = int(0.7 * n_g)
+    val_graphs = int(0.1 * n_g)
+
+    # if cmd_args.test_number == 0:
+    #     train_idxes = np.loadtxt('data/%s/10fold_idx/train_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+    #     test_idxes = np.loadtxt('data/%s/10fold_idx/test_idx-%d.txt' % (cmd_args.data, cmd_args.fold), dtype=np.int32).tolist()
+    #     return [g_list[i] for i in train_idxes], [g_list[i] for i in test_idxes]
+    # else:
+        # return g_list[: n_g - cmd_args.test_number], g_list[n_g - cmd_args.test_number :]
+    return g_list[:train_graphs], g_list[train_graphs: train_graphs + val_graphs], g_list[train_graphs + val_graphs:]
 
 
 

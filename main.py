@@ -120,7 +120,7 @@ class Classifier(nn.Module):
         elif len(feature_label) == 3:
             node_feat, edge_feat, labels = feature_label
         embed = self.gnn(batch_graph, node_feat, edge_feat)
-        return self.mlp(embed, labels)
+        return self.mlp(embed, labels, [graph.nodegroup for graph in batch_graph])
 
     def output_features(self, batch_graph):
         feature_label = self.PrepareFeatureLabel(batch_graph)
@@ -164,8 +164,8 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
             pbar.set_description('MSE_loss: %0.5f MAE_loss: %0.5f' % (loss, mae) )
             total_loss.append( np.array([loss, mae]) * len(selected_idx))
         else:
-            pbar.set_description('loss: %0.5f acc: %0.5f' % (loss, acc) )
-            total_loss.append( np.array([loss, acc]) * len(selected_idx))
+            pbar.set_description('loss: %0.5f head_acc: %0.5f med_acc: %0.5f tail_acc: %0.5f' % (loss, acc[0], acc[1], acc[2]))
+            total_loss.append(np.array([loss] + [sum(acc) / 3] + acc) * len(selected_idx))
 
 
         n_samples += len(selected_idx)
@@ -173,69 +173,144 @@ def loop_dataset(g_list, classifier, sample_idxes, optimizer=None, bsize=cmd_arg
         assert n_samples == len(sample_idxes)
     total_loss = np.array(total_loss)
     avg_loss = np.sum(total_loss, 0) / n_samples
-    all_scores = torch.cat(all_scores).cpu().numpy()
-    
+
     # np.savetxt('test_scores.txt', all_scores)  # output test predictions
     
-    if not classifier.regression and cmd_args.printAUC:
-        all_targets = np.array(all_targets)
-        fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
-        auc = metrics.auc(fpr, tpr)
-        avg_loss = np.concatenate((avg_loss, [auc]))
-    else:
-        avg_loss = np.concatenate((avg_loss, [0.0]))
+    # if not classifier.regression and cmd_args.printAUC:
+    #     all_targets = np.array(all_targets)
+    #     fpr, tpr, _ = metrics.roc_curve(all_targets, all_scores, pos_label=1)
+    #     auc = metrics.auc(fpr, tpr)
+    #     avg_loss = np.concatenate((avg_loss, [auc]))
+    # else:
+    #     avg_loss = np.concatenate((avg_loss, [0.0]))
     
     return avg_loss
 
 
 if __name__ == '__main__':
     print(cmd_args)
-    random.seed(cmd_args.seed)
-    np.random.seed(cmd_args.seed)
-    torch.manual_seed(cmd_args.seed)
+    SEEDS = [0, 1, 2, 3, 4]
 
-    train_graphs, test_graphs = load_data()
-    print('# train: %d, # test: %d' % (len(train_graphs), len(test_graphs)))
+    test_record = torch.zeros(len(SEEDS))
+    valid_record = torch.zeros(len(SEEDS))
+    tail_record = torch.zeros(len(SEEDS))
+    medium_record = torch.zeros(len(SEEDS))
+    head_record = torch.zeros(len(SEEDS))
 
-    if cmd_args.sortpooling_k <= 1:
-        num_nodes_list = sorted([g.num_nodes for g in train_graphs + test_graphs])
-        cmd_args.sortpooling_k = num_nodes_list[int(math.ceil(cmd_args.sortpooling_k * len(num_nodes_list))) - 1]
-        cmd_args.sortpooling_k = max(10, cmd_args.sortpooling_k)
-        print('k used in SortPooling is: ' + str(cmd_args.sortpooling_k))
+    for seed in SEEDS:
+        print(f"Training with SEED - {seed}")
 
-    classifier = Classifier()
-    if cmd_args.mode == 'gpu':
-        classifier = classifier.cuda()
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
 
-    optimizer = optim.Adam(classifier.parameters(), lr=cmd_args.learning_rate)
+        train_graphs, val_graphs, test_graphs = load_data()
+        print("Number of Train Graphs: ", len(train_graphs))
+        print("Number of Val Graphs: ", len(val_graphs))
+        print("Number of Test Graphs: ", len(test_graphs))
 
-    train_idxes = list(range(len(train_graphs)))
-    best_loss = None
-    for epoch in range(cmd_args.num_epochs):
-        random.shuffle(train_idxes)
-        classifier.train()
-        avg_loss = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
-        if not cmd_args.printAUC:
-            avg_loss[2] = 0.0
-        print('\033[92maverage training of epoch %d: loss %.5f acc %.5f auc %.5f\033[0m' % (epoch, avg_loss[0], avg_loss[1], avg_loss[2]))
+        best_acc = 0
 
-        classifier.eval()
-        test_loss = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
-        if not cmd_args.printAUC:
-            test_loss[2] = 0.0
-        print('\033[93maverage test of epoch %d: loss %.5f acc %.5f auc %.5f\033[0m' % (epoch, test_loss[0], test_loss[1], test_loss[2]))
+        if cmd_args.sortpooling_k <= 1:
+            num_nodes_list = sorted([g.num_nodes for g in train_graphs + test_graphs])
+            cmd_args.sortpooling_k = num_nodes_list[int(math.ceil(cmd_args.sortpooling_k * len(num_nodes_list))) - 1]
+            cmd_args.sortpooling_k = max(10, cmd_args.sortpooling_k)
+            print('k used in SortPooling is: ' + str(cmd_args.sortpooling_k))
 
-    with open(cmd_args.data + '_acc_results.txt', 'a+') as f:
-        f.write(str(test_loss[1]) + '\n')
+        classifier = Classifier()
+        if cmd_args.mode == 'gpu':
+            classifier = classifier.cuda()
 
-    if cmd_args.printAUC:
-        with open(cmd_args.data + '_auc_results.txt', 'a+') as f:
-            f.write(str(test_loss[2]) + '\n')
+        optimizer = optim.Adam(classifier.parameters(), lr=cmd_args.learning_rate)
 
-    if cmd_args.extract_features:
-        features, labels = classifier.output_features(train_graphs)
-        labels = labels.type('torch.FloatTensor')
-        np.savetxt('extracted_features_train.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
-        features, labels = classifier.output_features(test_graphs)
-        labels = labels.type('torch.FloatTensor')
-        np.savetxt('extracted_features_test.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
+        train_idxes = list(range(len(train_graphs)))
+        best_loss = 1
+        for epoch in range(cmd_args.num_epochs):
+            random.shuffle(train_idxes)
+            classifier.train()
+            avg_loss = loop_dataset(train_graphs, classifier, train_idxes, optimizer=optimizer)
+            # if not cmd_args.printAUC:
+            #     avg_loss[2] = 0.0
+            print('\033[92maverage training of epoch %d: loss %.5f acc %.5f head_acc %.5f med_acc %.5f tail_acc %.5f\033[0m' % (epoch, avg_loss[0], avg_loss[1], avg_loss[2], avg_loss[3], avg_loss[4]))
+
+            classifier.eval()
+            val_loss = loop_dataset(val_graphs, classifier, list(range(len(val_graphs))))
+            # if not cmd_args.printAUC:
+            #     test_loss[2] = 0.0
+            print('\033[93maverage val of epoch %d: loss %.5f acc %.5f head_acc %.5f med_acc %.5f tail_acc %.5f\033[0m' % (epoch, val_loss[0], val_loss[1], val_loss[2], val_loss[3], val_loss[4]))
+
+            if best_loss > val_loss[0] and best_acc < val_loss[1]:
+                classifier.eval()
+                test_loss = loop_dataset(test_graphs, classifier, list(range(len(test_graphs))))
+                print(
+                    '\033[91maverage test of epoch %d: loss %.5f acc %.5f head_acc %.5f med_acc %.5f tail_acc %.5f\033[0m' % (
+                    epoch, test_loss[0], test_loss[1], test_loss[2], test_loss[3], test_loss[4]))
+
+                best_loss = val_loss[0]
+                best_acc = val_loss[1]
+                best_test_metrics = test_loss
+                best_val_metrics = val_loss
+
+        with open(cmd_args.data + '_acc_results.txt', 'a+') as f:
+            f.write(str(test_loss[1]) + '\n')
+
+        if cmd_args.printAUC:
+            with open(cmd_args.data + '_auc_results.txt', 'a+') as f:
+                f.write(str(test_loss[2]) + '\n')
+
+        if cmd_args.extract_features:
+            features, labels = classifier.output_features(train_graphs)
+            labels = labels.type('torch.FloatTensor')
+            np.savetxt('extracted_features_train.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
+            features, labels = classifier.output_features(test_graphs)
+            labels = labels.type('torch.FloatTensor')
+            np.savetxt('extracted_features_test.txt', torch.cat([labels.unsqueeze(1), features.cpu()], dim=1).detach().numpy(), '%.4f')
+
+        test_record[seed] = best_test_metrics[1]
+        valid_record[seed] = best_val_metrics[1]
+        head_record[seed] = best_test_metrics[2]
+        medium_record[seed] = best_test_metrics[3]
+        tail_record[seed] = best_test_metrics[4]
+
+    args = cmd_args
+    with open("metrics.txt", "a") as txt_file:
+        txt_file.write(f"Dataset: {args.data}, \n"
+                       # f"Alpha: {args.alpha}, \n"
+                       # f"Mu: {args.mu1}, \n"
+                       f"Valid Mean: {round(valid_record.mean().item(), 4)} \n"
+                       f"Std Valid Mean: {round(valid_record.std().item(), 4)} \n"
+                       f"Test Mean: {round(test_record.mean().item(), 4)} \n"
+                       f"Std Test Mean: {round(test_record.std().item(), 4)} \n"
+                       f"Head Mean: {round(head_record.mean().item(), 4)} \n"
+                       f"Std Head Mean: {round(head_record.std().item(), 4)} \n"
+                       f"Medium Mean: {round(medium_record.mean().item(), 4)} \n"
+                       f"Std Medium Mean: {round(medium_record.std().item(), 4)}, \n"
+                       f"Tail Mean: {round(tail_record.mean().item(), 4)} \n"
+                       f"Std Tail Mean: {round(tail_record.std().item(), 4)} \n\n"
+                       )
+
+    # os.makedirs("sortpool", exist_ok=True)
+    # os.makedirs(os.path.join("sortpool", args.dataset), exist_ok=True)
+    #
+    # with open(os.path.join("sortpool", args.dataset, f"{args.dataset}_{args.alpha}_{args.mu1}.json", "w")) as json_file:
+    #     json.dump({"Dataset": args.dataset,
+    #                # "Alpha": {args.alpha},
+    #                # "Mu": args.mu1,
+    #                "Valid Mean": round(valid_record.mean().item(), 4),
+    #                "Std Valid Mean": round(valid_record.std().item(), 4),
+    #                "Test Mean": round(test_record.mean().item(), 4),
+    #                "Std Test Mean": round(test_record.std().item(), 4),
+    #                "Head Mean": round(head_record.mean().item(), 4),
+    #                "Std Head Mean": round(head_record.std().item(), 4),
+    #                "Medium Mean": round(medium_record.mean().item(), 4),
+    #                "Std Medium Mean": round(medium_record.std().item(), 4),
+    #                "Tail Mean": round(tail_record.mean().item(), 4),
+    #                "Std Tail Mean": round(tail_record.std().item(), 4)}, json_file
+    #               )
+
+    # print(seed_test_metrics.mean(axis=0))
+    # print(seed_val_metrics.mean(axis=0))
+    # print(seed_test_metrics.std(axis=0))
+    # print(seed_val_metrics.std(axis=0))
+
+
